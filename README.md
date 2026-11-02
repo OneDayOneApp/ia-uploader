@@ -12,6 +12,11 @@ Use the desktop app to select files and track progress, or use the CLI for scrip
 
 [Download v0.1.2 for Apple Silicon Mac](https://github.com/redoop/ia-uploader/releases/download/v0.1.2/Internet-Archive-Uploader-0.1.2-macOS-arm64.dmg) · [All releases](https://github.com/redoop/ia-uploader/releases)
 
+## Toonflow plugin
+
+A companion [Toonflow](https://github.com/HBAI-Ltd/Toonflow-app) tool plugin is included in [`toonflow/`](toonflow/README.md).
+It lets the Toonflow Agent upload workspace videos and images to Internet Archive using the same S3-style API as this uploader.
+
 ## Features
 
 - **Desktop and CLI:** File selection, drag-and-drop, an upload queue, progress reporting, transfer rates, and scriptable commands.

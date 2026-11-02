@@ -8,6 +8,11 @@
 
 Rust 编写的 Internet Archive 上传软件，同时提供原生桌面界面和命令行入口，共用认证、上传、重试逻辑。通过 S3 API Key 验证账号，然后以固定内存流式上传大文件。支持中文文件名/标题、多个文件顺序上传、发送进度与速率、网络错误及 HTTP 429/5xx 指数退避重试、307/308 重定向重新打开文件发送。凭据只发送到 HTTPS archive.org 或其子域，不写入磁盘或日志。
 
+## Toonflow 插件
+
+仓库内 [`toonflow/`](toonflow/README.md) 附带一个 [Toonflow](https://github.com/HBAI-Ltd/Toonflow-app) 工具插件，
+让 Toonflow 的 Agent 能把工作区里的视频和图片上传到 Internet Archive，使用的正是本工具的同一套 S3 接口。
+
 ## 编译
 
 安装 Rust 1.92 或更新版本，在本目录运行：
