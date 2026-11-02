@@ -414,12 +414,9 @@ async function startUpload() {
     const blob = await response.blob();
     sourceSize.value = blob.size;
 
-    /* 文件名：优先用上游素材名，去掉随机 UUID 前缀，补上扩展名 */
-    const rawName = decodeURIComponent((previewUrl.value.split("?")[0].split("/").pop()) ?? "");
-    const extension = extensionFromMime(source.value.mimeType || blob.type);
-    let fileName = rawName.replace(/^[0-9a-f-]{36}/i, "asset");
-    if (!/\.[a-zA-Z0-9]{1,10}$/.test(fileName) && extension) fileName = `${fileName}${extension}`;
-    if (!fileName) fileName = `asset${extension}`;
+    /* 文件名要有信息量：标题 > 上游原始名 > 带时间戳的兜底
+       注意不能用 previewUrl —— 那是 blob: URL，只有一串 UUID */
+    const fileName = buildFileName(originalFileName.value, source.value.mimeType || blob.type);
 
     const itemId = identifier.value.trim() ? sanitizeIdentifier(identifier.value) : `chequ-${timestamp()}`;
     const mediatype = guessMediatype(source.value.mimeType || blob.type, fileName);
@@ -467,6 +464,51 @@ function formatTime(timestamp: number) {
   const date = new Date(timestamp);
   const pad = (value: number) => String(value).padStart(2, "0");
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+/* 上游素材的原始文件名（来自 source.url，而不是预览用的 blob URL） */
+const originalFileName = computed(() => {
+  const url = source.value?.url ?? "";
+  if (!url) return "";
+  const withoutQuery = url.split("?")[0];
+  const last = withoutQuery.split(/[\\/]/).pop() ?? "";
+  try {
+    return decodeURIComponent(last);
+  } catch {
+    return last;
+  }
+});
+
+function isUuidLike(name: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.test(name);
+}
+
+/** 去掉路径分隔符与文件系统保留字符，保留中文与空格 */
+function sanitizeFileName(name: string) {
+  return name
+    .replace(/[\\/:*?"<>|\u0000-\u001f]/g, "-")
+    .replace(/\s+/g, " ")
+    .replace(/^[-.\s]+/, "")
+    .trim()
+    .slice(0, 120);
+}
+
+function buildFileName(rawName: string, mimeType: string) {
+  const extension = extensionFromMime(mimeType);
+  const hasExtension = (value: string) => /\.[a-zA-Z0-9]{1,10}$/.test(value);
+
+  /* 1) 用户填了标题就用标题 */
+  const titleText = sanitizeFileName(title.value.trim());
+  if (titleText) return hasExtension(titleText) ? titleText : `${titleText}${extension}`;
+
+  /* 2) 上游原始文件名，排除 UUID 这种没有信息量的 */
+  const original = sanitizeFileName(rawName);
+  if (original && !isUuidLike(original)) {
+    return hasExtension(original) ? original : `${original}${extension}`;
+  }
+
+  /* 3) 兜底：带时间戳，至少能区分不同批次 */
+  return `chequ-${timestamp()}${extension || ".bin"}`;
 }
 
 function buildMetaHeaders(itemTitle: string, mediatype: string) {
