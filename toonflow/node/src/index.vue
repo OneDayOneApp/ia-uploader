@@ -87,7 +87,7 @@
         :disabled="!source || uploading"
         :class="{ archivedButton: !!result }"
         @pointerdown.stop
-        @click.stop="startUpload">
+        @click.stop="requestArchive">
         {{ uploading ? `归档中 ${percent}%` : result ? "已归档 · 不可重复归档" : "归档到 archive.org" }}
       </el-button>
 
@@ -142,11 +142,44 @@
       <p v-else-if="ingestError" class="errorMessage" role="alert">{{ ingestError }}</p>
     </div>
   </nodeSkeleton>
+
+  <el-dialog
+    v-model="confirmVisible"
+    title="确认归档到 archive.org？"
+    width="380px"
+    align-center
+    append-to-body
+    class="archiveConfirm"
+    :close-on-click-modal="!uploading">
+    <div class="confirmBody">
+      <div class="confirmRow">
+        <span class="confirmKey">标题</span>
+        <span class="confirmValue">{{ confirmInfo.title }}</span>
+      </div>
+      <div class="confirmRow">
+        <span class="confirmKey">条目 ID</span>
+        <span class="confirmValue mono">{{ confirmInfo.identifier }}</span>
+      </div>
+      <div class="confirmRow">
+        <span class="confirmKey">文件</span>
+        <span class="confirmValue">{{ confirmInfo.fileName }}</span>
+      </div>
+      <div class="confirmRow">
+        <span class="confirmKey">类型</span>
+        <span class="confirmValue">{{ confirmInfo.kind }}</span>
+      </div>
+      <p class="confirmWarning">上传后内容将公开可检索，且难以撤销。请确认素材与信息无误。</p>
+    </div>
+    <template #footer>
+      <el-button :disabled="uploading" @click="confirmVisible = false">取消</el-button>
+      <el-button type="primary" :loading="uploading" @click="confirmAndUpload">确认归档</el-button>
+    </template>
+  </el-dialog>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, shallowRef, watch } from "vue";
-import { ElButton, ElCard, ElInput, ElProgress } from "element-plus";
+import { ElButton, ElCard, ElDialog, ElInput, ElProgress } from "element-plus";
 import { IconCircleCheck, IconCloudOff, IconKey, IconUpload, IconWorldUpload } from "@tabler/icons-vue";
 import {
   getTargetValues,
@@ -391,7 +424,29 @@ function guessMediatype(mimeType: string, fileName: string) {
 
 const uri = (value: string) => `uri(${encodeURIComponent(value)})`;
 
-async function startUpload() {
+/* 归档前的确认信息 */
+const confirmVisible = ref(false);
+
+const confirmInfo = computed(() => {
+  const mimeType = source.value?.mimeType ?? "";
+  const fileName = buildFileName(originalFileName.value, mimeType);
+  const kindLabel = mimeType.startsWith("image/")
+    ? "图片"
+    : mimeType.startsWith("video/")
+      ? "视频"
+      : mimeType.startsWith("audio/")
+        ? "音频"
+        : "文件";
+  const sizeText = sourceSize.value ? ` · ${formatSize(sourceSize.value)}` : "";
+  return {
+    title: title.value.trim() || fileName,
+    identifier: identifier.value.trim() ? sanitizeIdentifier(identifier.value) : "（自动生成）",
+    fileName,
+    kind: `${kindLabel}${sizeText}`,
+  };
+});
+
+function requestArchive() {
   if (!canUpload.value || !source.value) return;
   /* 已经归档过就不允许重复提交，避免在 archive.org 上留下多份重复条目 */
   if (result.value) {
@@ -404,6 +459,17 @@ async function startUpload() {
     errorMessage.value = "请先填写 archive.org 的 Access Key 与 Secret Key";
     return;
   }
+  errorMessage.value = "";
+  confirmVisible.value = true;
+}
+
+function confirmAndUpload() {
+  confirmVisible.value = false;
+  void startUpload();
+}
+
+async function startUpload() {
+  if (!source.value || uploading.value) return;
   errorMessage.value = "";
   result.value = null;
   uploading.value = true;
@@ -890,5 +956,54 @@ watch(
 
 .keysHint a {
   color: #6fd7c4;
+}
+</style>
+
+<style>
+/* 对话框 append-to-body，scoped 样式命中不了，单独用全局样式 */
+.archiveConfirm .el-dialog__title {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.archiveConfirm .confirmBody {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.archiveConfirm .confirmRow {
+  display: flex;
+  gap: 10px;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.archiveConfirm .confirmKey {
+  flex: none;
+  width: 56px;
+  color: var(--el-text-color-secondary);
+}
+
+.archiveConfirm .confirmValue {
+  flex: 1;
+  min-width: 0;
+  word-break: break-all;
+  color: var(--el-text-color-primary);
+}
+
+.archiveConfirm .confirmValue.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+}
+
+.archiveConfirm .confirmWarning {
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--el-color-warning-dark-2);
+  background: var(--el-color-warning-light-9);
 }
 </style>
